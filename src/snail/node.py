@@ -233,12 +233,16 @@ def node(
 def _extract_confidence(ok_payload: Any) -> float | None:
     if isinstance(ok_payload, BaseModel):
         if hasattr(ok_payload, "confidence"):
-            return float(ok_payload.confidence)
+            v = ok_payload.confidence
+            if v is not None:
+                return float(v)
         if hasattr(ok_payload, "score"):
-            return float(ok_payload.score)
+            v = ok_payload.score
+            if v is not None:
+                return float(v)
     if isinstance(ok_payload, dict):
-        if "confidence" in ok_payload:
+        if "confidence" in ok_payload and ok_payload["confidence"] is not None:
             return float(ok_payload["confidence"])
-        if "score" in ok_payload:
+        if "score" in ok_payload and ok_payload["score"] is not None:
             return float(ok_payload["score"])
     return None

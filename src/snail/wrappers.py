@@ -103,16 +103,17 @@ def HostedNode(
     api_key_env: str,
     confidence_threshold: float = 0.5,
     timeout_s: float = 30.0,
+    provider: str = "stub",
+    provider_kwargs: dict[str, Any] | None = None,
 ) -> Callable:
     """Wrap a hosted API (Anthropic, OpenAI, etc.) as a SNAIL node.
 
     The endpoint string is pinned. The API key is read from the named
-    environment variable — never hardcoded. The user must wire up the
-    actual API call inside their node body (kept out of v0.1.0 to avoid
-    baking in a specific provider).
+    environment variable — never hardcoded.
 
-    For v0.1.0, HostedNode just stamps the config and calls a stub.
-    Users extend it in v0.2.0 with their provider client.
+    In v0.2.0, HostedNode dispatches through the Provider registry.
+    Set `provider="anthropic"` (or `"openai"`, `"ollama"`) to call a
+    real LLM. The default `provider="stub"` keeps v0.1.0 behavior.
 
     Example:
         summarize = HostedNode(
@@ -120,9 +121,10 @@ def HostedNode(
             input_schema=InvoiceText,
             output_schema=InvoiceSummary,
             distribution="english_invoices_v1",
-            endpoint="anthropic://claude-sonnet-4-5",
+            endpoint="anthropic://claude-sonnet-5",
             prompt_template="Summarize: {text}",
             api_key_env="ANTHROPIC_API_KEY",
+            provider="anthropic",
         )
     """
     if not endpoint:
@@ -130,11 +132,12 @@ def HostedNode(
     if not api_key_env:
         raise ValueError(f"HostedNode({name!r}): api_key_env must be set")
 
+    # Resolve the model from the endpoint string ("scheme://model-name")
+    endpoint_model: str | None = None
+    if "://" in endpoint:
+        endpoint_model = endpoint.split("://", 1)[1] or None
+
     def body(ctx: NodeContext, weights: Any, *args: Any, **kwargs: Any) -> NodeResult:
-        # v0.1.0: this is a stub. Real provider wiring ships in v0.2.0.
-        # The point of v0.1.0 is that the *discipline* is in place: the
-        # node is typed, OOD-aware, frozen, and locked. Users wire up
-        # their own client.
         if args:
             payload = args[0]
         elif kwargs:
@@ -142,6 +145,9 @@ def HostedNode(
         else:
             payload = None
 
+        # API key check: missing key → OOD (preserves v0.1.0 behavior).
+        # The stub provider doesn't read this, but the check enforces the
+        # discipline that a real LLM call would.
         api_key = os.environ.get(api_key_env, "")
         if not api_key:
             return output_schema(
@@ -153,22 +159,67 @@ def HostedNode(
                 )
             )
 
-        # Build the stub response. Real providers wire in v0.2.0.
-        prompt = prompt_template.format(**payload) if isinstance(payload, dict) else prompt_template
-        # Return as a dict; the user-provided output_schema should accept
-        # a dict payload, or the user wraps it themselves.
+        # Build the prompt from the template + payload
+        prompt = (
+            prompt_template.format(**payload)
+            if isinstance(payload, dict)
+            else prompt_template
+        )
+
+        # Resolve provider from the in-process registry.
+        # Local imports to avoid circular deps at module load time.
+        from snail.providers import ProviderRegistry
+        from snail.providers.stub import StubProvider
+        from snail.providers.anthropic import AnthropicProvider
+        from snail.providers.openai_compat import OpenAICompatProvider
+        from snail.providers.ollama import OllamaProvider
+
+        registry = ProviderRegistry()
+        registry.register(StubProvider())
+        registry.register(AnthropicProvider())
+        registry.register(OpenAICompatProvider())
+        registry.register(OllamaProvider())
+
+        try:
+            prov = registry.get(provider)
+        except KeyError:
+            return output_schema(
+                ood=OODSignal(
+                    reason="explicit",
+                    confidence=0.0,
+                    threshold=confidence_threshold,
+                    distribution=distribution,
+                )
+            )
+
+        merged_kwargs: dict[str, Any] = dict(provider_kwargs or {})
+        merged_kwargs.setdefault("timeout_s", timeout_s)
+
+        try:
+            resp = prov.complete(prompt, model=endpoint_model, **merged_kwargs)
+            text = resp.text
+            confidence = resp.confidence
+        except Exception:
+            return output_schema(
+                ood=OODSignal(
+                    reason="explicit",
+                    confidence=0.0,
+                    threshold=confidence_threshold,
+                    distribution=distribution,
+                )
+            )
+
         raw = {
             "endpoint": endpoint,
             "prompt": prompt,
-            "stub": True,
+            "response": text,
+            "provider": provider,
+            "model": endpoint_model,
+            "confidence": confidence,
         }
         if isinstance(raw, output_schema):
             return raw
-        if isinstance(raw, BaseModel):
-            return output_schema(ok=raw)
-        if isinstance(raw, dict):
-            return output_schema(ok=raw)
-        return output_schema(ok={"value": raw})
+        return output_schema(ok=raw)
 
     wrapped = node(
         name=name,
@@ -185,6 +236,7 @@ def HostedNode(
             "endpoint": endpoint,
             "api_key_env": api_key_env,
             "timeout_s": timeout_s,
+            "provider": provider,
         },
     )
 
