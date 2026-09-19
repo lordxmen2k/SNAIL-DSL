@@ -1,0 +1,7 @@
+{
+  "id": "msg_test",
+  "model": "claude-sonnet-5",
+  "content": [{"type": "text", "text": "Hello back."}],
+  "stop_reason": "end_turn",
+  "usage": {"input_tokens": 5, "output_tokens": 3}
+}
