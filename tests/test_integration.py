@@ -22,7 +22,7 @@ from snail.training import load_recipe, train_recipe, verify_golden, write_golde
 
 
 def test_version_is_v020():
-    assert __version__ == "0.2.1"
+    assert __version__ == "0.2.2"
 
 
 class In(BaseModel):
