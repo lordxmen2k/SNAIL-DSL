@@ -132,4 +132,61 @@ Apache License 2.0. Copyright 2026 Tico Internet LLC.
 
 ## Status
 
-v0.1.0 — alpha. The core primitives (`@node`, `Program`, `edge()`, wrappers, manifest, lint) are working. The training pipeline for producing `.snail` weights is not yet included — that ships in v0.2.0.
+v0.2.0 — beta. Adds the training tooling (recipe YAML, `train_recipe`, `freeze_weights`, golden tests), real provider clients (`anthropic`, `openai`, `ollama`, `stub`), the `snail` CLI (`run`, `inspect`, `render`, `train`, `verify`), and a DAG renderer that emits SVG.
+
+## v0.2.0 quickstart
+
+### Train a recipe
+
+```yaml
+# recipe_classify_intent.recipe.yaml
+name: classify_intent
+dataset: customer_intents_v3
+frozen_output: weights/classify_intent.snail.json
+nodes:
+  - name: classify_intent
+    input_schema: Message
+    output_schema: Intent
+    distribution: customer_intents_v3
+    epochs: 5
+    learning_rate: 0.001
+    weight_pin: phi-4-mini-3.8b@sha256:placeholder
+golden_cases:
+  - input: {text: "I want a refund"}
+    expected: {intent: refund, confidence_min: 0.7}
+```
+
+```bash
+snail train recipe_classify_intent.recipe.yaml --output-dir ./weights
+```
+
+### Render the DAG
+
+```bash
+snail render examples/customer_support_v3.py --out dist/customer_support_v3.svg
+```
+
+### Use real providers
+
+```python
+import os
+os.environ["ANTHROPIC_API_KEY"] = "..."
+from snail.wrappers import HostedNode
+
+summarize = HostedNode(
+    name="summarize",
+    input_schema=In,
+    output_schema=Out,
+    distribution="english_v1",
+    endpoint="anthropic://claude-sonnet-5",
+    prompt_template="Summarize: {text}",
+    api_key_env="ANTHROPIC_API_KEY",
+    provider="anthropic",   # NEW in v0.2.0
+)
+```
+
+### Verify golden cases
+
+```bash
+snail verify examples/customer_support_v3.py --golden-dir ./goldens
+```
