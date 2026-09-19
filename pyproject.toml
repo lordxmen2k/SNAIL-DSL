@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snail-dsl"
-version = "0.2.0"
+version = "0.2.1"
 description = "Single Node Activated Inference Layer — a Python DSL for composing frozen neural primitives into typed dataflow programs."
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "Apache-2.0"}
