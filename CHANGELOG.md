@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3] — 2026-09-19
+
+### Changed
+- **Project description rewritten** to lead with the deterministic-pipeline positioning: "Deterministic LLM pipeline DSL — compose frozen, single-pass neural primitives into typed dataflow programs with OOD-as-type and tamper-evident manifests."
+- **README opening rewritten** to position SNAIL as the alternative to agentic LLM frameworks (LangChain / Claude Agent SDK / AutoGPT) before the glossary section.
+- **PyPI tags refreshed.** Dropped `agents`. Added `pipelines`, `workflows`, `deterministic-ai`, `typed-pipeline`, `frozen-weights`, `golden-tests`.
+
 ## [0.2.0] — 2026-09-19
 
 ### Added

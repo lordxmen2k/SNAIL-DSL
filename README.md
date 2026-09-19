@@ -6,9 +6,9 @@
 [![Status: Beta](https://img.shields.io/pypi/status/snail-dsl.svg)](https://pypi.org/project/snail-dsl/)
 [![Downloads](https://img.shields.io/pypi/dm/snail-dsl.svg)](https://pypistats.org/packages/snail-dsl)
 
-**A Python DSL for composing frozen, single-pass neural primitives into statically-typed dataflow programs.**
+**A Python DSL for composing frozen, single-pass neural primitives into statically-typed dataflow programs. Deterministic by design — the author composes the workflow as a typed DAG, the model fills in the leaves.**
 
-SNAIL programs are *recipes* — declared in Python, compiled into a typed DAG at construction time, executed one forward pass at a time. Every node is frozen, every output is locked, and out-of-distribution inputs are a first-class type rather than a runtime crash.
+SNAIL is the alternative to agentic LLM frameworks. Author composes, model fills leaves, OOD is a first-class return type, every run emits a tamper-evident manifest. There is no loop the model can get stuck in, because the execution graph has no back-edge worth calling one. Compared to LangChain / Claude Agent SDK / AutoGPT, SNAIL is structurally cheaper to bound, structurally easier to test, and structurally audit-ready.
 
 ```bash
 pip install snail-dsl

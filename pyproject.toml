@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snail-dsl"
-version = "0.2.2"
-description = "Single Node Activated Inference Layer — a Python DSL for composing frozen neural primitives into typed dataflow programs."
+version = "0.2.3"
+description = "Deterministic LLM pipeline DSL — compose frozen, single-pass neural primitives into typed dataflow programs with OOD-as-type and tamper-evident manifests."
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     {name = "Tico Internet LLC"},
 ]
-keywords = ["ai", "ml", "dsl", "frozen-models", "dataflow", "neural-networks", "agents"]
+keywords = ["ai", "ml", "dsl", "frozen-models", "dataflow", "neural-networks", "pipelines", "workflows", "deterministic-ai", "typed-pipeline", "frozen-weights", "golden-tests"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
