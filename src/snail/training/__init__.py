@@ -18,6 +18,8 @@ from __future__ import annotations
 from snail.training.parser import load_recipe
 from snail.training.recipe import GoldenCase, NodeSpec, Recipe
 from snail.training.trainer import train_recipe
+from snail.training.freezer import compute_sha256, freeze_weights
+from snail.training.golden import GoldenFailure, verify_golden, write_golden
 
 __all__ = [
     "Recipe",
@@ -25,4 +27,9 @@ __all__ = [
     "GoldenCase",
     "load_recipe",
     "train_recipe",
+    "freeze_weights",
+    "compute_sha256",
+    "write_golden",
+    "verify_golden",
+    "GoldenFailure",
 ]
