@@ -18,6 +18,71 @@ pip install snail-dsl
 
 ---
 
+## 📖 Glossary — every word SNAIL uses (read this first)
+
+Before you install anything or write any code, read this section. Every term you'll see in the rest of the README is defined here in plain English. If a word below is unfamiliar, the rest of the README won't make sense — that's why this comes first.
+
+### Concepts
+
+| Word | What it means in SNAIL (plain English) |
+|---|---|
+| **DSL** | "Domain-Specific Language." SNAIL is a small Python-based language for one specific purpose: building AI workflows out of small pieces. It looks like Python but adds extra rules and helpers. |
+| **Recipe** | The instructions for building an AI workflow. In code, it's a Python file with `@node` decorators and a `Program(...)` call. In training, it's a YAML file with `name`, `dataset`, `nodes`, and `golden_cases`. **A recipe describes what should happen. A program is the actual thing that runs.** |
+| **Node** | One step in a recipe. It's a Python function wrapped with `@node`. When the program runs, each node fires exactly once and produces one output. Think of a recipe with steps — each step is a node. |
+| **Program** | The whole recipe wired up. It's a `Program(...)` object that holds a list of nodes and a list of edges (the connections between nodes). You call `program.run(input)` to execute it. |
+| **DAG** | "Directed Acyclic Graph." A flow chart with no loops. Node A feeds Node B feeds Node C. The arrows (edges) point one way and there are no cycles. **Every SNAIL program is a DAG** — that's the entire structure. |
+| **Edge** | A connection between two nodes, telling SNAIL "the output of this node flows into that node." Built with `edge(node.ok)` or `edge(node.ood)`. |
+| **Frozen weights** | A saved snapshot of a model's parameters (the numbers it learned during training). Once frozen, they never change. Loading a model gives you frozen weights. The word "frozen" means: locked, immutable, can't be silently upgraded. |
+| **Distribution** | The "training data" a node was trained on. If new input looks very different from that data, the node says "I don't know" instead of guessing wrong. Example: `distribution="customer_intents_v3"` means "this node was trained on the v3 customer-intents dataset." |
+| **OOD** | "Out-Of-Distribution." When input doesn't match what the node was trained on. SNAIL doesn't crash on OOD — it returns a special `OODSignal` saying "I'm not confident, please handle this case explicitly." |
+| **OK / OOD result** | Every node's output has TWO possible shapes: `ok` (with the answer) or `ood` (saying "I don't know"). The schema is `class MyResult(NodeResult): ok: ... | None = None; ood: OODSignal | None = None`. The program decides what to do with each. |
+| **Confidence threshold** | A number between 0 and 1. If the node's confidence is below this number, the result is **automatically flipped to OOD**. Default is 0.5. Set it to 0.7 to be more strict. |
+| **Confidence score** | A number between 0 and 1 that the model itself reports: "I'm 0.95 confident in this answer." Comes from the node's output. If it's below the threshold, SNAIL flips to OOD. |
+| **Manifest** | A structured log of what happened during one `run()` call. It records which nodes fired, in what order, how long each took, whether each returned `ok` or `ood`, and any errors. You can read it after `run()` to audit the program's behavior. |
+| **Provider** | A way to talk to a language model. SNAIL has built-in providers: `stub` (no network, default), `anthropic` (Claude), `openai` (GPT and OpenAI-compatible APIs), `ollama` (local models). You pick the provider via `provider="anthropic"` etc. |
+| **Wrapper** | A factory that turns an external thing (a hosted API, a local model, a pure function) into a SNAIL node. The three wrappers are `HostedNode`, `ExternalLocalNode`, `DeterministicNode`. |
+| **CLI** | "Command-Line Interface." The `snail` command you type in your terminal. It has five subcommands: `run`, `inspect`, `render`, `train`, `verify`. |
+
+### Files and outputs
+
+| Term | What it is |
+|---|---|
+| **Frozen weights file** | A `.snail.json` file produced by training a recipe. Contains the recipe spec, the training settings, and a sha256 hash so you can verify the file wasn't tampered with. Format: `snail-json-v1`. |
+| **Trace file** | A `<node>_trace.json` file produced during training. Contains the input/output of each sample the model saw. Useful for debugging what the training actually did. |
+| **Golden case** | A tiny test stored as a JSON file: "if the input is X, the output should be Y." The verifier runs all golden cases against your program and reports which ones fail. |
+| **Golden directory** | The folder where you store golden cases. Layout: `goldens/golden/<node-name>/<case-id>.json`. |
+| **SVG** | "Scalable Vector Graphics." An image format that's just XML. SNAIL renders your program as an SVG file so you can open it in a browser and see the nodes + edges visually. |
+| **YAML** | "YAML Ain't Markup Language." A text format for config files. Recipes are written in YAML. Looks like `key: value` with indentation. |
+
+### Commands in the CLI
+
+| Command | What it does |
+|---|---|
+| `snail run <file> --input '<json>'` | Run a program once and print its manifest. |
+| `snail inspect <file>` | Print a program's structure: nodes, edges, distributions. No execution. |
+| `snail render <file> --out <svg>` | Render the DAG to an SVG file you can open in a browser. |
+| `snail train <recipe.yaml> --output-dir <dir>` | Train a recipe: emit a frozen weights file + a trace file. |
+| `snail verify <file> --golden-dir <dir>` | Run golden cases against the program, exit 0 if all pass, 1 if any fail. |
+
+### Symbols and notation
+
+| Symbol | What it means |
+|---|---|
+| `@node(...)` | The decorator that wraps a function as a SNAIL node. Anything inside the parentheses is the node's configuration. |
+| `node.ok` | A reference to the OK variant of a node's output. Used with `edge()` to say "if this node returns OK, send the result to...". |
+| `node.ood` | A reference to the OOD variant. Used with `edge()` to say "if this node returns OOD, send it down the fallback path." |
+| `result.is_ok` | True if the result is the OK variant. |
+| `result.is_ood` | True if the result is the OOD variant. |
+| `result.terminal` | The last node that fired. |
+| `result.outputs` | A dictionary: `{node_name: NodeResult}`. Read outputs by name. |
+| `result.manifest` | The structured log of the run. |
+
+---
+
+Now that the words are clear, let's install and run.
+
+---
+
 ## 📋 Step 0 — Before you start
 
 You will need:
@@ -39,7 +104,7 @@ You will need:
   ```
 
 You will **not** need:
-- An API key for any LLM (we use the built-in stub).
+- An API key for any LLM (we use the built-in stub, no network).
 - A GPU.
 - A database.
 - An internet connection after the initial `pip install`.
@@ -59,7 +124,7 @@ pip install snail-dsl
 Wait for it to finish. You should see lines like:
 
 ```
-Successfully installed annotated-types-0.8.0 click-8.5.0 httpx-0.28.1 pydantic-2.13.5 pyyaml-6.0.3 snail-dsl-0.2.0 ...
+Successfully installed annotated-types-0.8.0 click-8.5.0 httpx-0.28.1 pydantic-2.13.5 pyyaml-6.0.3 snail-dsl-0.2.1 ...
 ```
 
 Now confirm the install worked:
@@ -71,16 +136,16 @@ python -c "import snail; print(snail.__version__)"
 Expected output:
 
 ```
-0.2.0
+0.2.1
 ```
 
-If you see `0.2.0`, the install worked. Move to Step 2.
+If you see `0.2.1`, the install worked. Move to Step 2.
 
 ---
 
 ## ✅ Step 2 — Run your first SNAIL program
 
-We are going to type a small program into a file, then run it. This program classifies the intent of a customer message. It has two nodes (two small functions) connected together.
+We are going to type a small program into a file, then run it. This program classifies the intent of a customer message (e.g., "I want a refund" → "refund"). It has two nodes connected together.
 
 ### 2.1 — Create the program file
 
@@ -89,36 +154,47 @@ Open your text editor (Notepad on Windows, TextEdit on macOS, VS Code, anything)
 Copy-paste this **exactly** into the file:
 
 ```python
-"""hello_snail.py — your first SNAIL program."""
+"""hello_snail.py — your first SNAIL program.
+
+This program has two nodes connected together:
+  1. classify_intent — looks at a customer message and decides if it's
+     about a refund, billing, or something else.
+  2. extract_entities — based on the intent, pretends to pull out an
+     order ID (in real use this would call a real model).
+
+Each node returns either an "ok" result (with the answer) or an "ood"
+result (saying "I don't know — this isn't what I was trained on").
+"""
 
 # 1. We need these types from SNAIL and pydantic.
+#    pydantic is a library that lets us define data shapes in Python.
 from pydantic import BaseModel
 from snail import (
-    node,
-    Program,
-    edge,
-    NodeContext,
-    NodeResult,
-    OODSignal,
+    node,            # the @node decorator
+    Program,         # the DAG container
+    edge,            # the connection builder between nodes
+    NodeContext,     # per-call info passed to each node body
+    NodeResult,      # base class for "ok or ood" result types
+    OODSignal,       # the "I don't know" payload
 )
 
-# 2. Tell SNAIL what a "good" output looks like.
+# 2. Tell SNAIL what a "good" output looks like for the first node.
 #    A node returns either `ok` (success) or `ood` (not sure).
 class IntentOk(BaseModel):
     intent: str
-    confidence: float
+    confidence: float  # how sure the model is, 0.0 to 1.0
 
 class Intent(NodeResult):
-    ok: IntentOk | None = None
-    ood: OODSignal | None = None
+    ok: IntentOk | None = None     # filled in on success
+    ood: OODSignal | None = None   # filled in when OOD
 
 # 3. Wrap a function with @node. This becomes a "node" in the DAG.
 @node(
     name="classify_intent",
-    input_schema=dict,
-    output_schema=Intent,
-    distribution="customer_intents_v3",   # the training distribution
-    confidence_threshold=0.7,            # below this → OOD
+    input_schema=dict,                  # we'll accept a plain dict
+    output_schema=Intent,               # the result must match Intent
+    distribution="customer_intents_v3", # the training distribution
+    confidence_threshold=0.7,           # below this → OOD
 )
 def classify_intent(ctx: NodeContext, weights, message: dict):
     text = message.get("text", "").lower()
@@ -128,6 +204,7 @@ def classify_intent(ctx: NodeContext, weights, message: dict):
         intent = "billing"
     else:
         intent = "other"
+    # Return "ok" with our answer. SNAIL wraps this in Intent(...).
     return Intent(ok=IntentOk(intent=intent, confidence=0.95))
 
 # 4. A second node that depends on the first.
@@ -141,21 +218,23 @@ class Entities(NodeResult):
 
 @node(
     name="extract_entities",
-    input_schema=Intent,
+    input_schema=Intent,                  # takes the previous node's output
     output_schema=Entities,
     distribution="customer_entities_v3",
     confidence_threshold=0.6,
 )
 def extract_entities(ctx: NodeContext, weights, intent_result: Intent):
+    # If the upstream node was OOD, propagate OOD.
     if intent_result.is_ood:
         return Entities(ood=intent_result.ood)
+    # Otherwise extract a fake order ID (in real use, call a real model).
     return Entities(ok=EntitiesOk(order_id="ORD-12345", confidence=0.85))
 
-# 5. Wire them into a program (the typed DAG).
+# 5. Wire them into a Program (the typed DAG).
 program = Program(
     name="hello_snail",
     nodes=[classify_intent, extract_entities],
-    edges=[edge(classify_intent.ok)],   # OK output of classify → input of extract
+    edges=[edge(classify_intent.ok)],   # classify's OK → extract's input
 )
 
 # 6. Run it.
@@ -184,6 +263,16 @@ Order ID: ORD-12345
 
 If you see those two lines, you just ran your first SNAIL program. 🎉
 
+**What just happened, in plain English:**
+
+1. SNAIL loaded your `classify_intent` node and `extract_entities` node.
+2. SNAIL validated that the DAG is well-formed (one node feeds the other, types match).
+3. You called `program.run(...)` with a message.
+4. SNAIL called `classify_intent` first. It returned `ok` with `intent="refund"`.
+5. SNAIL routed that result to `extract_entities` as input.
+6. `extract_entities` returned `ok` with `order_id="ORD-12345"`.
+7. SNAIL gave you back both outputs in `result.outputs`.
+
 If you see an error, paste the full error message to me (or open an issue on GitHub) and I'll help fix it.
 
 ---
@@ -211,13 +300,15 @@ Program: hello_snail
 
 This tells you:
 - The program has two nodes.
-- One edge connects them: the OK output of `classify_intent` feeds into the input of `extract_entities`.
+- One edge connects them: the **OK** output of `classify_intent` feeds into the input of `extract_entities`.
+
+"Distribution" is the name of the training data each node was built from (see the glossary at the top of this README).
 
 ---
 
-## 🎨 Step 4 — Render the DAG to SVG
+## 🎨 Step 4 — Render the DAG to SVG (draw it as a picture)
 
-Another subcommand draws your program as a picture:
+Another subcommand draws your program as a picture you can open in any browser:
 
 ```bash
 snail render hello_snail.py --out hello_snail.svg
@@ -229,7 +320,9 @@ Open `hello_snail.svg` in any web browser. You'll see a picture with two boxes (
 
 ## 🚂 Step 5 — Train a recipe (no real model needed)
 
-Now we teach SNAIL how to "train" a node from a recipe. Recipes are YAML files that say "here is the dataset, here are the training settings, here is where to put the frozen weights when done."
+Now we teach SNAIL how to "train" a node from a recipe. A **recipe** is a YAML file that says "here is the training data, here are the training settings, here is where to put the frozen weights when done."
+
+In v0.2.1, the trainer is a discipline scaffold: it runs the loop, records what happened, and saves the metadata. The actual model training (calling PyTorch / your framework) is the `model_forward` callback — for now we use a stub that returns canned responses. v0.3.0+ will ship built-in trainers.
 
 ### 5.1 — Create the recipe
 
@@ -253,6 +346,19 @@ golden_cases:
   - input: {text: "What is my balance?"}
     expected: {intent: billing, confidence_min: 0.7}
 ```
+
+What each line means in plain English:
+- `name`: the name of this recipe (you can call it anything).
+- `dataset`: the training data this recipe trains against.
+- `frozen_output`: where to write the frozen weights file (the file that records what was trained).
+- `nodes`: the nodes in this recipe (just one here).
+  - `name`: the node's name (must match the node in your program).
+  - `input_schema` / `output_schema`: the input/output types (described elsewhere in your code).
+  - `distribution`: which training distribution the node belongs to.
+  - `epochs`: how many passes through the training data (5 here).
+  - `learning_rate`: how aggressively the model updates (0.001 = slow).
+  - `weight_pin`: a fake hash pinning the model to a specific version.
+- `golden_cases`: the test cases to run after training.
 
 Save the file.
 
@@ -305,7 +411,14 @@ You'll see something like:
 }
 ```
 
-This is the **frozen weights file**. It records exactly what training happened. You can audit it, ship it, pin a specific version, or reject any program that uses a different version.
+This is the **frozen weights file**. It records exactly what training happened:
+- Which recipe produced it.
+- Which node it applies to.
+- The training settings (epochs, learning rate).
+- The weight pin (which exact model version was used).
+- The sha256 hash, so anyone can verify the file wasn't tampered with.
+
+You can audit it, ship it, pin a specific version, or reject any program that uses a different version.
 
 ---
 
@@ -331,6 +444,10 @@ In your text editor, create `goldens/golden/classify_intent/case.json` with this
 ```
 
 Save.
+
+What each line means in plain English:
+- `input`: what we send to the program.
+- `expected`: what we expect back. `intent: refund` means the field must equal `"refund"`. `confidence_min: 0.7` means the `confidence` field must be at least `0.7` (you can also use `_max` for upper bounds).
 
 ### 6.2 — Run the verifier
 
@@ -371,7 +488,7 @@ Everything up to Step 6 used the **stub provider** — no network calls, no API 
 
 ### 7.1 — Set the API key
 
-For Anthropic:
+For Anthropic (Claude):
 
 ```bash
 # macOS / Linux
@@ -384,7 +501,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 $env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
 
-For OpenAI:
+For OpenAI (GPT):
 
 ```bash
 export OPENAI_API_KEY="sk-..."
@@ -399,7 +516,7 @@ ollama pull llama4-scout
 
 ### 7.2 — Switch the provider in your code
 
-In `hello_snail.py`, find the line where you built `summarize` (or add one). Replace `provider="stub"` with one of:
+In `hello_snail.py`, add a new node that uses a hosted model. Replace `provider="stub"` with one of:
 
 ```python
 provider="anthropic"   # uses ANTHROPIC_API_KEY env var
@@ -428,7 +545,7 @@ If the API key is missing, the node returns **OOD** instead of crashing. The dis
 
 ## 🎉 You are done
 
-You have now used every piece of SNAIL v0.2.0:
+You have now used every piece of SNAIL v0.2.1:
 
 - ✅ `@node`, `Program`, `edge()`, `Manifest` (the four primitives)
 - ✅ `HostedNode` with stub (default) + Anthropic / OpenAI / Ollama (real)
@@ -493,7 +610,7 @@ pip install snail-dsl
 
 ## Status
 
-v0.2.0 — beta. The discipline is locked. See `CHANGELOG.md` for what changed since v0.1.0.
+v0.2.1 — beta. The discipline is locked. See `CHANGELOG.md` for what changed since v0.1.0.
 
 ## License
 
