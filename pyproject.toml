@@ -29,6 +29,7 @@ dependencies = [
     "pydantic>=2.0",
     "httpx>=0.25,<1",
     "pyyaml>=6.0,<7",
+    "click>=8.1,<9",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +46,9 @@ Repository = "https://github.com/lordxmen2k/SNAIL-DSL"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+snail = "snail.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
