@@ -1,0 +1,14 @@
+name: classify_intent
+dataset: customer_intents_v3
+frozen_output: weights/classify_intent.snail.json
+nodes:
+  - name: classify_intent
+    input_schema: Message
+    output_schema: Intent
+    distribution: customer_intents_v3
+    epochs: 5
+    learning_rate: 0.001
+    weight_pin: phi-4-mini-3.8b@sha256:placeholder
+golden_cases:
+  - input: {text: "I want a refund for order #12345"}
+    expected: {intent: refund, confidence_min: 0.7}
