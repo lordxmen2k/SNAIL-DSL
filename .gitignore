@@ -51,3 +51,6 @@ weights/*.snail
 .env.*
 *.pem
 .git-credentials
+
+# Internal scratch
+.superpowers/
