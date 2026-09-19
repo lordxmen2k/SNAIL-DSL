@@ -17,10 +17,12 @@ from __future__ import annotations
 
 from snail.training.parser import load_recipe
 from snail.training.recipe import GoldenCase, NodeSpec, Recipe
+from snail.training.trainer import train_recipe
 
 __all__ = [
     "Recipe",
     "NodeSpec",
     "GoldenCase",
     "load_recipe",
+    "train_recipe",
 ]
