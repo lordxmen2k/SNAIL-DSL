@@ -1,5 +1,11 @@
 # SNAIL — Single Node Activated Inference Layer
 
+[![PyPI version](https://img.shields.io/pypi/v/snail-dsl.svg)](https://pypi.org/project/snail-dsl/)
+[![Python versions](https://img.shields.io/pypi/pyversions/snail-dsl.svg)](https://pypi.org/project/snail-dsl/)
+[![License](https://img.shields.io/pypi/l/snail-dsl.svg)](https://github.com/lordxmen2k/SNAIL-DSL/blob/main/LICENSE)
+[![Development Status](https://img.shields.io/pypi/status/snail-dsl.svg)](https://pypi.org/project/snail-dsl/)
+[![Downloads](https://img.shields.io/pypi/dm/snail-dsl.svg)](https://pypi.org/project/snail-dsl/)
+
 A Python DSL for composing **frozen, single-pass neural primitives** into **statically-typed dataflow programs**.
 
 If an MCP tool and a markdown skill had a baby, and you told the LLM it wasn't allowed to interpret the recipe — it was just one of many nodes in the recipe — you'd get SNAIL.
