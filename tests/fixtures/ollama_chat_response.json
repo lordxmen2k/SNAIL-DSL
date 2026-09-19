@@ -1,0 +1,7 @@
+{
+  "model": "llama4-scout",
+  "message": {"role": "assistant", "content": "Hi back."},
+  "done": true,
+  "total_duration": 12345678,
+  "eval_count": 3
+}
