@@ -80,3 +80,71 @@ def test_cli_render_writes_svg(tmp_path: Path):
     assert result.exit_code == 0
     assert out.exists()
     assert out.read_text().startswith("<?xml")
+
+
+def test_cli_train_emits_weights(tmp_path: Path):
+    recipe = tmp_path / "test.recipe.yaml"
+    recipe.write_text(
+        "name: t\n"
+        "dataset: d\n"
+        "frozen_output: out.snail.json\n"
+        "nodes:\n"
+        "  - name: n\n"
+        "    input_schema: In\n"
+        "    output_schema: Out\n"
+        "    distribution: d\n"
+        "    epochs: 1\n"
+        "    learning_rate: 0.001\n"
+        "    weight_pin: model@sha256:x\n"
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["train", str(recipe), "--output-dir", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "n" in result.output
+    assert any(tmp_path.rglob("*.snail.json"))
+
+
+def test_cli_verify_passes(tmp_path: Path):
+    prog_file = tmp_path / "p.py"
+    prog_file.write_text(
+        "from pydantic import BaseModel\n"
+        "from snail import node, NodeContext, NodeResult, OODSignal, Program\n"
+        "class In(BaseModel):\n    x: int\n"
+        "class Ok(BaseModel):\n    y: int\n"
+        "class Out(NodeResult):\n    ok: Ok | None = None\n    ood: OODSignal | None = None\n"
+        "@node(name='double', input_schema=In, output_schema=Out, distribution='t')\n"
+        "def double(ctx, w, p): return Out(ok=Ok(y=p.x*2))\n"
+        "prog = Program(name='p', nodes=[double])\n"
+    )
+    golden_dir = tmp_path / "goldens"
+    (golden_dir / "golden" / "double").mkdir(parents=True)
+    (golden_dir / "golden" / "double" / "case.json").write_text(
+        json.dumps({"input": {"x": 5}, "expected": {"y": 10}})
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["verify", str(prog_file), "--golden-dir", str(golden_dir)])
+    assert result.exit_code == 0
+    assert "passed" in result.output or "0 failures" in result.output
+
+
+def test_cli_verify_fails_on_mismatch(tmp_path: Path):
+    prog_file = tmp_path / "p.py"
+    prog_file.write_text(
+        "from pydantic import BaseModel\n"
+        "from snail import node, NodeContext, NodeResult, OODSignal, Program\n"
+        "class In(BaseModel):\n    x: int\n"
+        "class Ok(BaseModel):\n    y: int\n"
+        "class Out(NodeResult):\n    ok: Ok | None = None\n    ood: OODSignal | None = None\n"
+        "@node(name='double', input_schema=In, output_schema=Out, distribution='t')\n"
+        "def double(ctx, w, p): return Out(ok=Ok(y=p.x*2))\n"
+        "prog = Program(name='p', nodes=[double])\n"
+    )
+    golden_dir = tmp_path / "goldens"
+    (golden_dir / "golden" / "double").mkdir(parents=True)
+    (golden_dir / "golden" / "double" / "case.json").write_text(
+        json.dumps({"input": {"x": 5}, "expected": {"y": 999}})
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["verify", str(prog_file), "--golden-dir", str(golden_dir)])
+    assert result.exit_code == 1
+    assert "failure" in (result.output + (result.stderr or ""))
