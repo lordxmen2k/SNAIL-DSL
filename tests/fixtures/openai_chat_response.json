@@ -1,0 +1,6 @@
+{
+  "id": "chatcmpl-test",
+  "model": "gpt-5-2026-07",
+  "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi back."}, "finish_reason": "stop"}],
+  "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3}
+}
