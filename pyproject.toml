@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snail-dsl"
-version = "0.2.3"
-description = "Deterministic LLM pipeline DSL — compose frozen, single-pass neural primitives into typed dataflow programs with OOD-as-type and tamper-evident manifests."
+version = "0.3.0"
+description = "Deterministic LLM pipeline DSL — compose frozen, single-pass neural primitives into typed dataflow programs with OOD-as-type, escalation, parallel fan-out, and tamper-evident cost manifests."
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     {name = "Tico Internet LLC"},
 ]
-keywords = ["ai", "ml", "dsl", "frozen-models", "dataflow", "neural-networks", "pipelines", "workflows", "deterministic-ai", "typed-pipeline", "frozen-weights", "golden-tests"]
+keywords = ["ai", "ml", "dsl", "frozen-models", "dataflow", "neural-networks", "pipelines", "workflows", "deterministic-ai", "typed-pipeline", "frozen-weights", "golden-tests", "escalation", "parallel", "fan-out", "tier-routing", "cost-tracking"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

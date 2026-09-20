@@ -105,6 +105,7 @@ def HostedNode(
     timeout_s: float = 30.0,
     provider: str = "stub",
     provider_kwargs: dict[str, Any] | None = None,
+    cost_tier: str = "medium",
 ) -> Callable:
     """Wrap a hosted API (Anthropic, OpenAI, etc.) as a SNAIL node.
 
@@ -199,6 +200,10 @@ def HostedNode(
             resp = prov.complete(prompt, model=endpoint_model, **merged_kwargs)
             text = resp.text
             confidence = resp.confidence
+            tokens_in = resp.tokens_in
+            tokens_out = resp.tokens_out
+            cost = resp.cost_usd
+            model_id = resp.model or endpoint_model or ""
         except Exception:
             return output_schema(
                 ood=OODSignal(
@@ -214,8 +219,11 @@ def HostedNode(
             "prompt": prompt,
             "response": text,
             "provider": provider,
-            "model": endpoint_model,
+            "model": model_id,
             "confidence": confidence,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "cost_usd": cost,
         }
         if isinstance(raw, output_schema):
             return raw
@@ -237,6 +245,7 @@ def HostedNode(
             "api_key_env": api_key_env,
             "timeout_s": timeout_s,
             "provider": provider,
+            "cost_tier": cost_tier,
         },
     )
 
@@ -249,6 +258,7 @@ def DeterministicNode(
     fn: Callable,
     ood_on_none: bool = True,
     distribution: str = "deterministic",
+    cost_tier: str = "small",
 ) -> Callable:
     """Wrap a pure function as a SNAIL node.
 
@@ -307,7 +317,7 @@ def DeterministicNode(
             frozen_weights="",  # empty → no weights file required
             confidence_threshold=0.0,
         )(body),
-        {"wrapped_kind": "deterministic", "ood_on_none": ood_on_none},
+        {"wrapped_kind": "deterministic", "ood_on_none": ood_on_none, "cost_tier": cost_tier},
     )
 
 

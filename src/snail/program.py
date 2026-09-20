@@ -137,12 +137,16 @@ class Program:
         name: str,
         nodes: list[Callable],
         edges: list[Edge] | None = None,
+        escalations: list | None = None,
+        parallel_groups: list | None = None,
         strict_mode: bool = True,
     ):
         self.name = name
         self.strict_mode = strict_mode
         self._node_proxies: dict[str, NodeProxy] = {}
         self._raw_edges: list[Edge] = list(edges or [])
+        self._raw_escalations: list = list(escalations or [])
+        self._raw_parallel_groups: list = list(parallel_groups or [])
         self._validated_edges: list[Edge] = []
 
         if not nodes:
@@ -174,8 +178,58 @@ class Program:
         """Run static validation. Fail loud if strict_mode is True."""
         errors: list[str] = []
 
+        # 0. Resolve escalations: cost-tier check + collect into edges list.
+        from snail.escalation import _tier_of, escalation_to_edge
+
+        # 0a. Resolve parallel groups into edges.
+        for group in self._raw_parallel_groups:
+            if group.inputs_node not in self._node_proxies:
+                errors.append(
+                    f"Parallel group inputs from unknown node {group.inputs_node!r}"
+                )
+                continue
+            for t in group.target_nodes:
+                if t not in self._node_proxies:
+                    errors.append(
+                        f"Parallel group targets unknown node {t!r}"
+                    )
+                    continue
+            self._raw_edges.extend(group.to_edges())
+
+        # 0b. Resolve escalations to edges.
+        escalation_edges: list[Edge] = []
+        for spec in self._raw_escalations:
+            if spec.source_node not in self._node_proxies:
+                errors.append(
+                    f"Escalation from unknown node {spec.source_node!r}"
+                )
+                continue
+            if spec.target_node not in self._node_proxies:
+                errors.append(
+                    f"Escalation targets unknown node {spec.target_node!r}"
+                )
+                continue
+            # Re-derive cost tiers from the actual node objects in the registry.
+            src_proxy = self._node_proxies[spec.source_node]
+            tgt_proxy = self._node_proxies[spec.target_node]
+            src_tier = _tier_of(src_proxy.fn)
+            tgt_tier = _tier_of(tgt_proxy.fn)
+            if tgt_tier < src_tier:
+                errors.append(
+                    f"Escalation from {spec.source_node!r} (tier={src_tier.value}) "
+                    f"to {spec.target_node!r} (tier={tgt_tier.value}) is a "
+                    "cost downgrade — escalation must move to a heavier tier."
+                )
+            spec.source_tier = src_tier
+            spec.target_tier = tgt_tier
+            escalation_edges.append(escalation_to_edge(spec))
+
         # 1. Every edge must reference a known node.
         for e in self._raw_edges:
+            # Guard: only Edge objects have source_node. ParallelGroups live in
+            # _raw_parallel_groups and were already resolved above into edges.
+            if not hasattr(e, "source_node"):
+                continue
             if e.source_node not in self._node_proxies:
                 errors.append(
                     f"Edge from unknown node {e.source_node!r} "
@@ -196,23 +250,32 @@ class Program:
         #     in declared order (the terminal sink).
 
         node_order = list(self._node_proxies.keys())
-        claimed_by_ok: set[str] = set()
+        # claimed_by_ok tracks (target_node, target_field) pairs, not just nodes.
+        # Multiple OK edges can target the same node as long as they go to
+        # different fields (this is how parallel_edges merge works).
+        claimed_by_ok: set[tuple[str, str]] = set()
         for e in self._raw_edges:
             if e.source_variant == "ok" and e.target_node:
-                claimed_by_ok.add(e.target_node)
+                claimed_by_ok.add((e.target_node, e.target_field))
+
+        # Combine all raw edges (including those from parallel groups
+        # and escalations) for resolution + cycle detection.
+        all_raw_edges: list[Edge] = list(self._raw_edges) + list(escalation_edges)
 
         resolved: list[Edge] = []
-        for e in self._raw_edges:
+        for e in all_raw_edges:
             if e.target_node:
                 resolved.append(e)
                 continue
 
             if e.source_variant == "ok":
-                # OK edges go to the next unclaimed node.
+                # OK edges go to the next unclaimed node (where unclaimed
+                # means no other OK edge has already claimed that
+                # target_node+target_field pair).
                 source_idx = node_order.index(e.source_node)
                 for cand_name in node_order[source_idx + 1 :]:
-                    if cand_name not in claimed_by_ok:
-                        claimed_by_ok.add(cand_name)
+                    if (cand_name, e.target_field) not in claimed_by_ok:
+                        claimed_by_ok.add((cand_name, e.target_field))
                         resolved.append(
                             Edge(
                                 source_node=e.source_node,
@@ -417,11 +480,25 @@ class Program:
                     # but be defensive.
                     result = proxy.fn(ctx_node, program_input)
                 dt = (time.time() - t0) * 1000.0
+                # v0.3.0 — extract cost/token fields from the wrapped
+                # ProviderResponse (if present).
+                tokens_in, tokens_out, cost, model_id = 0, 0, 0.0, ""
+                if result.is_ok and result.ok is not None:
+                    raw_dict = getattr(result.ok, "model_dump", lambda: {})()
+                    if isinstance(raw_dict, dict):
+                        tokens_in = int(raw_dict.get("tokens_in", 0) or 0)
+                        tokens_out = int(raw_dict.get("tokens_out", 0) or 0)
+                        cost = float(raw_dict.get("cost_usd", 0.0) or 0.0)
+                        model_id = str(raw_dict.get("model", "") or "")
                 manifest.record_node(
                     node_name=node_name,
                     variant="ood" if result.is_ood else "ok",
                     latency_ms=dt,
                     confidence=_extract_confidence(result.ok) if result.is_ok else None,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost_usd=cost,
+                    model_id=model_id,
                 )
             except Exception as e:
                 manifest.record_error(node_name=node_name, error=str(e))

@@ -27,6 +27,10 @@ class ProviderResponse:
     latency_ms: float
     raw: dict[str, Any] = field(default_factory=dict)
     model: str = ""
+    # v0.3.0 — cost/tokens (optional; providers fill when available)
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cost_usd: float = 0.0
 
 
 class Provider(ABC):

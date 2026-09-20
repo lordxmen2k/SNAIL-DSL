@@ -14,7 +14,7 @@ License: Apache 2.0. Copyright 2026 Tico Internet LLC.
 from __future__ import annotations
 import os
 import time
-from typing import Any
+from typing import Any, Optional
 import httpx
 
 from snail.providers.base import Provider, ProviderResponse
@@ -24,6 +24,7 @@ from snail.providers.errors import (
     SchemaError,
     TimeoutError,
 )
+from snail.providers.pricing import cost_usd
 
 
 _DEFAULT_BASE = "https://api.anthropic.com"
@@ -51,6 +52,8 @@ class AnthropicProvider(Provider):
         timeout_s: float = 30.0,
         system: str | None = None,
         max_tokens: int = 1024,
+        cost_per_1k_input: Optional[float] = None,
+        cost_per_1k_output: Optional[float] = None,
         **kwargs: Any,
     ) -> ProviderResponse:
         api_key = os.environ.get(self.api_key_env)
@@ -99,10 +102,27 @@ class AnthropicProvider(Provider):
             if block.get("type") == "text":
                 text += block.get("text", "")
 
+        # v0.3.0 — tokens + cost
+        usage = data.get("usage", {}) or {}
+        tokens_in = int(usage.get("input_tokens", 0))
+        tokens_out = int(usage.get("output_tokens", 0))
+        actual_model = data.get("model", model)
+        cost = cost_usd(
+            "anthropic",
+            actual_model,
+            tokens_in,
+            tokens_out,
+            override_input=cost_per_1k_input,
+            override_output=cost_per_1k_output,
+        )
+
         return ProviderResponse(
             text=text,
             confidence=None,  # Anthropic Messages API does not expose logprobs
             latency_ms=latency_ms,
             raw=data,
-            model=data.get("model", model),
+            model=actual_model,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=cost,
         )
