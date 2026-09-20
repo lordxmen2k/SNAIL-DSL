@@ -196,6 +196,27 @@ class Program:
                     continue
             self._raw_edges.extend(group.to_edges())
 
+        # 0c. v0.4.0 — verify weight_pin against any declared frozen_weights.
+        from snail.weights import parse_weight_pin, verify_weight_pin
+
+        for n_name, proxy in self._node_proxies.items():
+            fn = proxy.fn
+            pin = getattr(fn, "_snail_weight_pin", None)
+            weights_path = getattr(fn, "_snail_frozen_weights", None) or ""
+            if pin:
+                # Validate pin format first.
+                try:
+                    parse_weight_pin(pin)
+                except ValueError as e:
+                    errors.append(f"Node {n_name!r}: {e}")
+                    continue
+                # If a weights file was declared, verify it now.
+                if weights_path:
+                    try:
+                        verify_weight_pin(pin, weights_path)
+                    except Exception as e:
+                        errors.append(f"Node {n_name!r}: {type(e).__name__}: {e}")
+
         # 0b. Resolve escalations to edges.
         escalation_edges: list[Edge] = []
         for spec in self._raw_escalations:

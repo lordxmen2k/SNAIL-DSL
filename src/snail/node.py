@@ -111,6 +111,8 @@ class SnailNode:
         confidence_threshold: float,
         weights: FrozenWeights | None,
         original_fn: Callable,
+        weight_pin: str | None = None,
+        frozen_weights_path: str = "",
     ):
         self._wrapped = wrapped
         self._snail_name = name
@@ -120,6 +122,8 @@ class SnailNode:
         self._snail_confidence_threshold = confidence_threshold
         self._snail_weights = weights
         self._original_fn = original_fn
+        self._snail_weight_pin = weight_pin
+        self._snail_frozen_weights = frozen_weights_path
         functools.update_wrapper(self, wrapped)
 
     def __call__(self, ctx: NodeContext, *args: Any, **kwargs: Any) -> NodeResult:
@@ -149,6 +153,7 @@ def node(
     distribution: str,
     frozen_weights: str | os.PathLike | None = None,
     weights_sha256: str | None = None,
+    weight_pin: str | None = None,
     confidence_threshold: float = 0.5,
 ) -> Callable[[Callable], SnailNode]:
     """Decorator: wrap a function as a SNAIL node.
@@ -172,6 +177,12 @@ def node(
             weights = None
 
     def decorator(fn: Callable) -> SnailNode:
+        # If weight_pin was given, parse it once here so a malformed pin
+        # fails loudly at decoration time (before Program construction).
+        if weight_pin is not None:
+            from snail.weights import parse_weight_pin
+            parse_weight_pin(weight_pin)
+
         @functools.wraps(fn)
         def wrapped(ctx: NodeContext, *args: Any, **kwargs: Any) -> NodeResult:
             if args and isinstance(input_schema, type) and issubclass(input_schema, BaseModel):
@@ -225,6 +236,8 @@ def node(
             confidence_threshold=confidence_threshold,
             weights=weights,
             original_fn=fn,
+            weight_pin=weight_pin,
+            frozen_weights_path=str(frozen_weights) if frozen_weights else "",
         )
 
     return decorator

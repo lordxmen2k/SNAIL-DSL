@@ -26,11 +26,17 @@ from snail.node import node, NodeContext, FrozenWeights
 from snail.program import Program, Edge, edge, NodeProxy, ProgramRunResult
 from snail.escalation import escalate, EscalationSpec, CostTier
 from snail.parallel import parallel_edges, ParallelGroup
+from snail.weights import (
+    parse_weight_pin,
+    verify_weight_pin,
+    WeightPinMismatch,
+)
+from snail.calibrate import run_calibration, CalibrationReport
 from snail.types.result import NodeResult
 from snail.types.ood import OODSignal
 from snail.manifest import Manifest, ManifestBuilder
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # core
@@ -48,6 +54,12 @@ __all__ = [
     "CostTier",
     "parallel_edges",
     "ParallelGroup",
+    # v0.4.0 auditability
+    "parse_weight_pin",
+    "verify_weight_pin",
+    "WeightPinMismatch",
+    "run_calibration",
+    "CalibrationReport",
     # types
     "NodeResult",
     "OODSignal",

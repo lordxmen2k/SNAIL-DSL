@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0] — 2026-09-20
+
+### Added
+- **SHA-256 weight pinning** (`src/snail/weights.py`). `parse_weight_pin(pin)` validates the `<model>@sha256:<64-hex>` format; `verify_weight_pin(pin, path)` raises `WeightPinMismatch` if the file's hash doesn't match. `Program(...)` runs the check at construction time — a mismatched pin fails the program before `.run()` is called.
+- **`@node` decorator accepts `weight_pin`** alongside `frozen_weights`. The pin survives into the SnailNode and is read by Program validation.
+- **Confidence calibration tooling** (`src/snail/calibrate.py`). `run_calibration(program, golden_cases)` produces a `CalibrationReport` with ECE over 10 bins, per-bin statistics, and JSON serialization. `plot_reliability_diogram()` emits a matplotlib reliability diagram (optional).
+- **`snail calibrate` CLI subcommand**. Loads a program, runs all golden cases under `--golden-dir`, writes JSON to `--output`, optionally writes a PNG to `--plot`. Exits 0 if ECE < `--threshold` (default 0.10); exits 1 otherwise. Suitable for CI gating.
+- **Example: `examples/calibration_demo.py`** shows the calibration report shape end-to-end.
+
+### Backward compatibility
+- All 114 v0.3.0 tests pass without modification.
+- The new `weight_pin` decorator kwarg is opt-in. Existing nodes without it behave exactly as in v0.3.0.
+
+### Benchmarks (all green)
+- 127 tests passing (114 v0.3.0 + 7 weight_pin + 6 calibrate).
+
 ## [0.3.0] — 2026-09-20
 
 ### Added

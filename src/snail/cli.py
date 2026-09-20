@@ -6,6 +6,7 @@ Subcommands:
     render   — render the program DAG to SVG
     train    — run a recipe through the trainer
     verify   — verify golden test cases
+    calibrate — run confidence calibration analysis (v0.4.0)
 
 License: Apache 2.0. Copyright 2026 Tico Internet LLC.
 """
@@ -139,6 +140,63 @@ def verify(program_path: Path, golden_dir: Path) -> None:
             click.echo(f"  - {f.case_id}: {f.reason}", err=True)
         sys.exit(1)
     click.echo("0 failures — all golden cases passed.")
+
+
+@cli.command()
+@click.argument("program_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--golden-dir", "golden_dir", required=True, type=click.Path(path_type=Path))
+@click.option("--output", "output_path", type=click.Path(path_type=Path), default=Path("calibration.json"))
+@click.option("--plot", "plot_path", type=click.Path(path_type=Path), default=None)
+@click.option("--threshold", "ece_threshold", type=float, default=0.10, help="ECE threshold for CI exit code (default 0.10).")
+def calibrate(
+    program_path: Path,
+    golden_dir: Path,
+    output_path: Path,
+    plot_path: Path | None,
+    ece_threshold: float,
+) -> None:
+    """Run confidence calibration analysis on a SNAIL program's golden cases.
+
+    Emits a JSON CalibrationReport (and optionally a reliability-diagram PNG).
+    Exits 0 if ECE < threshold; exits 1 otherwise.
+    """
+    from snail.calibrate import run_calibration, plot_reliability_diogram
+
+    # Load golden cases: each .json file is one case.
+    cases = []
+    for json_path in sorted(Path(golden_dir).rglob("*.json")):
+        cases.append(json.loads(json_path.read_text()))
+
+    if not cases:
+        click.echo(f"No golden cases found under {golden_dir}", err=True)
+        sys.exit(1)
+
+    program = _load_program(program_path)
+    report = run_calibration(program, cases)
+
+    Path(output_path).write_text(report.to_json(), encoding="utf-8")
+    click.echo(
+        f"Wrote {output_path} | ECE={report.ece:.4f} | "
+        f"acc={report.accuracy:.3f} | n={report.n_cases}"
+    )
+
+    if plot_path is not None:
+        try:
+            plot_reliability_diogram(report, plot_path)
+            click.echo(f"Wrote {plot_path} ({Path(plot_path).stat().st_size:,} bytes)")
+        except ImportError as e:
+            click.echo(f"Plot skipped: {e}", err=True)
+
+    report.below_threshold = report.ece < ece_threshold
+    Path(output_path).write_text(report.to_json(), encoding="utf-8")
+
+    if not report.below_threshold:
+        click.echo(
+            f"ECE {report.ece:.4f} exceeds threshold {ece_threshold:.4f}",
+            err=True,
+        )
+        sys.exit(1)
+    click.echo(f"ECE {report.ece:.4f} below threshold {ece_threshold:.4f}")
 
 
 def main() -> None:
