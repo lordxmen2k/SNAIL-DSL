@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.2] — 2026-09-20
+
+### Changed
+- **README version strings bumped from 0.2.1 → 0.4.1.** PyPI's first impression of v0.4.1 had a stale "Status: v0.2.1 — beta" line under the "audit-ready" claim, plus pip-install output and expected-`__version__` examples still printed `0.2.1`. A reader walking the README top-to-bottom saw outdated version numbers before they reached the new-features section. All five occurrences corrected; a 2-line 📌 callout above Step 0 now links to "What's new in v0.3.0 + v0.4.0" so readers see the version-jump context before walking through the install. v0.4.2 ships the corrected README; v0.4.1 on PyPI still has the old wording (the README only re-renders on a new version upload).
+
 ## [0.4.1] — 2026-09-20
 
 ### Fixed
