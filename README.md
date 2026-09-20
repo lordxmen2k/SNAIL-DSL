@@ -156,6 +156,8 @@ A standalone end-to-end demo that exercises all four primitives (`escalate`, `pa
 
 Now that the words are clear, let's install and run.
 
+> **📌 Note:** You're about to install **SNAIL v0.4.1** (released September 2026). It includes escalation, parallel fan-out, SHA-256 weight pinning, and confidence calibration on top of the v0.1.0/v0.2.x frozen-pipeline discipline. If you're evaluating SNAIL as a LangChain/Claude Agent SDK alternative, read the [What's new in v0.3.0 + v0.4.0](#-whats-new-in-v030--v040) section above before installing.
+
 ---
 
 ## 📋 Step 0 — Before you start
@@ -199,7 +201,7 @@ pip install snail-dsl
 Wait for it to finish. You should see lines like:
 
 ```
-Successfully installed annotated-types-0.8.0 click-8.5.0 httpx-0.28.1 pydantic-2.13.5 pyyaml-6.0.3 snail-dsl-0.2.1 ...
+Successfully installed annotated-types-0.8.0 click-8.5.0 httpx-0.28.1 pydantic-2.13.5 pyyaml-6.0.3 snail-dsl-0.4.1 ...
 ```
 
 Now confirm the install worked:
@@ -211,10 +213,10 @@ python -c "import snail; print(snail.__version__)"
 Expected output:
 
 ```
-0.2.1
+0.4.1
 ```
 
-If you see `0.2.1`, the install worked. Move to Step 2.
+If you see `0.4.1`, the install worked. Move to Step 2.
 
 ---
 
@@ -397,7 +399,7 @@ Open `hello_snail.svg` in any web browser. You'll see a picture with two boxes (
 
 Now we teach SNAIL how to "train" a node from a recipe. A **recipe** is a YAML file that says "here is the training data, here are the training settings, here is where to put the frozen weights when done."
 
-In v0.2.1, the trainer is a discipline scaffold: it runs the loop, records what happened, and saves the metadata. The actual model training (calling PyTorch / your framework) is the `model_forward` callback — for now we use a stub that returns canned responses. v0.3.0+ will ship built-in trainers.
+In v0.4.1, the trainer is a discipline scaffold: it runs the loop, records what happened, and saves the metadata. The actual model training (calling PyTorch / your framework) is the `model_forward` callback — for now we use a stub that returns canned responses. v0.5.0+ will ship built-in trainers.
 
 ### 5.1 — Create the recipe
 
@@ -620,7 +622,7 @@ If the API key is missing, the node returns **OOD** instead of crashing. The dis
 
 ## 🎉 You are done
 
-You have now used every piece of SNAIL v0.2.1:
+You have now used every piece of SNAIL v0.4.1:
 
 - ✅ `@node`, `Program`, `edge()`, `Manifest` (the four primitives)
 - ✅ `HostedNode` with stub (default) + Anthropic / OpenAI / Ollama (real)
@@ -685,7 +687,7 @@ pip install snail-dsl
 
 ## Status
 
-v0.2.1 — beta. The discipline is locked. See `CHANGELOG.md` for what changed since v0.1.0.
+v0.4.1 — beta. The discipline is locked. See `CHANGELOG.md` for what changed since v0.1.0.
 
 ## License
 
