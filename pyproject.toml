@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snail-dsl"
-version = "0.4.0"
+version = "0.4.1"
 description = "Deterministic LLM pipeline DSL — compose frozen, single-pass neural primitives into typed dataflow programs with OOD-as-type, escalation, parallel fan-out, tamper-evident cost manifests, SHA-256 weight pinning, and confidence calibration."
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "Apache-2.0"}

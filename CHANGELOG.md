@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.1] — 2026-09-20
+
+### Fixed
+- **Program validation no longer chokes on ParallelGroup mixed with Edge in the validation loop.** The OK-edge `claimed_by_ok` loop now guards against non-Edge entries (e.g., `EscalationSpec`, `ParallelGroup`) which were incorrectly appearing in `_raw_edges` after the v0.3.0 changes. Affects programs that mix `escalations=[]` with `parallel_groups=[]` in the same `Program(...)` call.
+- **`examples/end_to_end.py`**: a worked end-to-end demo that exercises `escalate`, `parallel_edges`, `weight_pin`, and `calibration` in one pipeline.
+
+### Changed
+- **README** now has a top-level "What's new in v0.3.0 + v0.4.0" section with code examples for every new primitive. PyPI's first impression matches the v0.4.0 reality.
+- CLI commands table includes the new `snail calibrate` subcommand.
+
+### Backward compatibility
+- All 127 v0.4.0 tests still pass without modification.
+
 ## [0.4.0] — 2026-09-20
 
 ### Added

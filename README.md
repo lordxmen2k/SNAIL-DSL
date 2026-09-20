@@ -68,6 +68,7 @@ Before you install anything or write any code, read this section. Every term you
 | `snail render <file> --out <svg>` | Render the DAG to an SVG file you can open in a browser. |
 | `snail train <recipe.yaml> --output-dir <dir>` | Train a recipe: emit a frozen weights file + a trace file. |
 | `snail verify <file> --golden-dir <dir>` | Run golden cases against the program, exit 0 if all pass, 1 if any fail. |
+| `snail calibrate <file> --golden-dir <dir> --output <report.json> [--plot <png>] [--threshold <0.10>]` | Run confidence calibration analysis. Exits 0 if ECE < threshold; 1 otherwise. Suitable for CI gating. |
 
 ### Symbols and notation
 
@@ -81,6 +82,75 @@ Before you install anything or write any code, read this section. Every term you
 | `result.terminal` | The last node that fired. |
 | `result.outputs` | A dictionary: `{node_name: NodeResult}`. Read outputs by name. |
 | `result.manifest` | The structured log of the run. |
+
+---
+
+## 🆕 What's new in v0.3.0 + v0.4.0
+
+If you read an older write-up of SNAIL, here's what changed since v0.2.x:
+
+### v0.3.0 — workflow primitives
+
+The piece the codebase actually had was chaining + routing. v0.3.0 added the two other workflow shapes the agentic-AI market expects:
+
+- **`escalate(node, to=other)`** — one-line wiring of `OOD → heavier-model`. The small-model-first / large-model-on-OOD pattern that the 2026 SLM-economics literature is converging on, in one line. Rejects cost-tier downgrades (`large → small` is forbidden) and cycles at construction time.
+  ```python
+  from snail import Program, edge, escalate
+  from snail.wrappers import HostedNode, DeterministicNode
+
+  cheap = HostedNode(name="cheap", output_schema=Out, ..., cost_tier="small")
+  heavy = HostedNode(name="heavy", output_schema=Out, ..., cost_tier="large")
+
+  Program(name="esc", nodes=[cheap, heavy, sink],
+          edges=[edge(cheap.ok, target_field="input"),
+                 edge(heavy.ok, target_field="input")],
+          escalations=[escalate(cheap.ood, to=heavy)])
+  ```
+- **`parallel_edges(inputs=node, to=[list])`** — fan-out routing. Multiple nodes receive the same input; their OK results merge downstream as separate typed fields. Rounds out the "chaining + routing + parallelization" set the agentic-AI literature assumes.
+- **Cost ledger in `Manifest`.** Every node event now carries `tokens_in`, `tokens_out`, `cost_usd`, `model_id`. The top-level `manifest.summary` aggregates totals. Anthropic + OpenAI-compatible providers populate this from `usage.*`. Local providers (`stub`, `ollama`) report zero.
+
+### v0.4.0 — auditability
+
+Two claims the v2.0 book was making but the v0.3.0 codebase couldn't keep:
+
+- **`weight_pin` SHA-256 verification** — `@node(frozen_weights=path, weight_pin="model@sha256:<hex>")` is enforced at `Program(...)` construction time. Mismatch raises `WeightPinMismatch` immediately, before any inference cost. Turns "frozen and hash-verified" from a marketing claim into a verifiable discipline.
+  ```python
+  from snail import verify_weight_pin, WeightPinMismatch
+  try:
+      verify_weight_pin("phi-4-mini@sha256:ab12...", "weights/phi-4-mini.snail.json")
+      # weights file's hash matches — safe to load
+  except WeightPinMismatch as e:
+      raise RuntimeError("Model upgrade detected mid-run; refusing to load") from e
+  ```
+- **`snail calibrate` CLI** — runs the program's golden cases, computes Expected Calibration Error (ECE) over 10 bins, exits 0/1 based on ECE vs `--threshold`. Turns "trustworthy confidence" from wishful into a CI gate.
+  ```bash
+  snail calibrate my_program.py \
+      --golden-dir tests/golden \
+      --output report.json \
+      --plot report.png \
+      --threshold 0.10
+  # Exit 0: ECE < threshold (model is calibrated enough for deployment)
+  # Exit 1: ECE ≥ threshold (reject the model, retrain or revise threshold)
+  ```
+- **`run_calibration()` Python API** for embedding calibration in custom tests.
+
+The new primitives compose. A real customer-support pipeline in the wild looks like this:
+
+```python
+# See examples/customer_support_v3.py for the full source.
+customer_support = Program(
+    nodes=[classify_t1, classify_t2, extract_email, extract_phone,
+           safety_check, send, human_review],
+    edges=[parallel_edges(classify_t1, to=[extract_email, extract_phone])],
+    escalations=[escalate(classify_t1.ood, to=classify_t2)],
+)
+result = customer_support.run({"text": "I want a refund for order #12345"})
+# Tier-1 fires; if it's confident, parallel extractors run.
+# If tier-1 OOD'd, tier-2 escalates. The manifest records every
+# tier fired, every token spent, every cost incurred.
+```
+
+A standalone end-to-end demo that exercises all four primitives (`escalate`, `parallel_edges`, `weight_pin`, `calibration`) lives at `examples/end_to_end.py` in the source repo and at `https://github.com/lordxmen2k/SNAIL-DSL/blob/main/examples/end_to_end.py`.
 
 ---
 

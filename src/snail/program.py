@@ -276,6 +276,10 @@ class Program:
         # different fields (this is how parallel_edges merge works).
         claimed_by_ok: set[tuple[str, str]] = set()
         for e in self._raw_edges:
+            # _raw_edges may contain EscalationSpec / ParallelGroup objects
+            # alongside Edge; skip non-Edge entries — they're handled elsewhere.
+            if not hasattr(e, "source_variant"):
+                continue
             if e.source_variant == "ok" and e.target_node:
                 claimed_by_ok.add((e.target_node, e.target_field))
 

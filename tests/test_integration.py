@@ -1,4 +1,4 @@
-"""End-to-end integration test for v0.4.0.
+"""End-to-end integration test for v0.4.1.
 
 Exercises: train_recipe → freeze → write_golden → verify_golden →
 render_svg → CLI run. All in a single tmp_path so it's a true
@@ -21,8 +21,8 @@ from snail.render import render_program_svg
 from snail.training import load_recipe, train_recipe, verify_golden, write_golden
 
 
-def test_version_is_v040():
-    assert __version__ == "0.4.0"
+def test_version_is_v041():
+    assert __version__ == "0.4.1"
 
 
 class In(BaseModel):
